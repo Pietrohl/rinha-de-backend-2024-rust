@@ -3,6 +3,9 @@ use axum::extract::path::ErrorKind;
 use axum::extract::rejection::PathRejection;
 use axum::extract::FromRequestParts;
 use axum::extract::State;
+use axum::response::IntoResponse;
+use axum::response::Response;
+use axum::Json;
 use axum::{
     http::{request::Parts, StatusCode},
     routing::get,
@@ -11,14 +14,36 @@ use axum::{
 };
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
-use tokio_postgres::NoTls;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio_postgres::NoTls;
+use tokio_postgres::Row;
+
+#[derive(Serialize, Deserialize)]
+struct Client {
+    id: i32,
+    name: String,
+    limit: i32,
+    balance: i32,
+}
+
+impl Client {
+    pub fn from(row: &Row) -> Client {
+        Client {
+            id: row.get("id"),
+            name: row.get("name"),
+            limit: row.get("limit"),
+            balance: row.get("balance"),
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() {
-    let manager =
-        PostgresConnectionManager::new_from_stringlike("host=localhost user=postgres", NoTls)
-            .unwrap();
+    let manager = PostgresConnectionManager::new_from_stringlike(
+        "host=localhost user=postgres dbname=rinha_db",
+        NoTls,
+    )
+    .unwrap();
     let pool = Pool::builder().build(manager).await.unwrap();
 
     let app = Router::new()
@@ -36,15 +61,21 @@ type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
 async fn transacao() {}
 async fn extrato(
     State(pool): State<ConnectionPool>,
-    Path(id): Path<u32>,
-) -> Result<String, (StatusCode, String)> {
+    Path(id): Path<u16>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let conn = pool.get().await.map_err(internal_error)?;
+
     let row = conn
-        .query_one("select 1 + 1", &[])
+        .query_one(
+            "SELECT *
+        FROM clients
+        WHERE id = $1;",
+            &[&(id as i32)],
+        )
         .await
         .map_err(internal_error)?;
-    let two: i32 = row.try_get(0).map_err(internal_error)?;
-    Ok((two as u64 + id as u64).to_string())
+
+    Ok(Json(Client::from(&row)))
 }
 
 fn internal_error<E>(err: E) -> (StatusCode, String)
