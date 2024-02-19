@@ -6,3 +6,8 @@ RESULTADOS-HEADER.md
 sync-git.sh
 
 quantos-testes-faltam?.sh
+
+
+# Added by cargo
+
+/target
