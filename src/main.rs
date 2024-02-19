@@ -1,10 +1,10 @@
+use std::time::SystemTime;
 use axum::async_trait;
 use axum::extract::path::ErrorKind;
 use axum::extract::rejection::PathRejection;
 use axum::extract::FromRequestParts;
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::response::Response;
 use axum::Json;
 use axum::{
     http::{request::Parts, StatusCode},
@@ -14,10 +14,10 @@ use axum::{
 };
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio_postgres::NoTls;
 use tokio_postgres::Row;
-
 #[derive(Serialize, Deserialize)]
 struct Client {
     id: i32,
@@ -33,6 +33,58 @@ impl Client {
             name: row.get("name"),
             limit: row.get("limit"),
             balance: row.get("balance"),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Balance {
+    total: i32,
+    date: DateTime<Utc>,
+    limit: i32,
+}
+#[derive(Serialize)]
+struct Transaction {
+    value: i32,
+    transaction_type: Box<str>,
+    description: String,
+    timestamp: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+struct Statement {
+    balance: Balance,
+    last_transactions: Vec<Transaction>,
+}
+
+impl Statement {
+    pub fn from(rows: Vec<Row>) -> Statement {
+        let mut transactions = Vec::new();
+
+        let client = Client::from(&rows.first().unwrap());
+
+        let balance = Balance {
+            total: client.balance,
+            limit: client.limit,
+            date: SystemTime::now().into(),
+        };
+
+        for row in rows {
+            let unix_timestamp: SystemTime = row.get("transaction_timestamp");
+
+            let transaction = Transaction {
+                value: row.get("transaction_value"),
+                transaction_type: row.get("transaction_type"),
+                description: row.get("transaction_description"),
+                timestamp: unix_timestamp.into(),
+            };
+
+            transactions.push(transaction);
+        }
+
+        Statement {
+            balance,
+            last_transactions: transactions,
         }
     }
 }
@@ -59,23 +111,37 @@ async fn main() {
 type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
 
 async fn transacao() {}
+
 async fn extrato(
     State(pool): State<ConnectionPool>,
     Path(id): Path<u16>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let conn = pool.get().await.map_err(internal_error)?;
 
-    let row = conn
-        .query_one(
-            "SELECT *
-        FROM clients
-        WHERE id = $1;",
+    let rows = conn
+        .query(
+            "SELECT 
+            c.id AS id,
+            c.name AS name,
+            c.limit AS limit,
+            c.balance AS balance,
+            t.id AS transaction_id,
+            t.value AS transaction_value,
+            t.type AS transaction_type,
+            t.description AS transaction_description,
+            t.timestamp AS transaction_timestamp
+        FROM 
+            clients c
+        LEFT JOIN 
+            transactions t ON c.id = t.client_id
+        WHERE
+            c.id = $1;",
             &[&(id as i32)],
         )
         .await
         .map_err(internal_error)?;
 
-    Ok(Json(Client::from(&row)))
+    Ok(Json(Statement::from(rows)))
 }
 
 fn internal_error<E>(err: E) -> (StatusCode, String)
