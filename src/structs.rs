@@ -1,13 +1,12 @@
-use serde::de::DeserializeOwned;
-use std::time::SystemTime;
-
 use axum::{
     async_trait,
-    extract::{path::ErrorKind, rejection::PathRejection, FromRequestParts},
+    extract::{path, rejection::PathRejection, FromRequestParts},
     http::{request::Parts, StatusCode},
 };
 use chrono::{DateTime, Utc};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::{io::Error, time::SystemTime};
 use tokio_postgres::Row;
 
 #[derive(Serialize, Deserialize)]
@@ -15,7 +14,7 @@ pub struct Client {
     id: i32,
     name: String,
     limit: i32,
-    balance: i32,
+    pub balance: i32,
 }
 
 impl Client {
@@ -25,6 +24,24 @@ impl Client {
             name: row.get("name"),
             limit: row.get("limit"),
             balance: row.get("balance"),
+        }
+    }
+    pub fn new_transaction(&mut self, value: i32, transaction_type: &str) -> Result<(), Error> {
+        match transaction_type {
+            "c" => {
+                self.balance += value;
+
+
+                Ok(())
+            }
+            "d" => {
+                if (self.balance + self.limit - value) < 0 {
+                    return Err(Error::new(std::io::ErrorKind::Other, "Insufficient funds"));
+                }
+                self.balance -= value;
+                Ok(())
+            }
+            _ => Err(Error::new(std::io::ErrorKind::Other, "Invalid transaction type")),
         }
     }
 }
@@ -134,32 +151,32 @@ where
 
                         let kind = inner.into_kind();
                         let body = match &kind {
-                            ErrorKind::WrongNumberOfParameters { .. } => PathError {
+                            path::ErrorKind::WrongNumberOfParameters { .. } => PathError {
                                 message: kind.to_string(),
                                 location: None,
                             },
 
-                            ErrorKind::ParseErrorAtKey { key, .. } => PathError {
+                            path::ErrorKind::ParseErrorAtKey { key, .. } => PathError {
                                 message: kind.to_string(),
                                 location: Some(key.clone()),
                             },
 
-                            ErrorKind::ParseErrorAtIndex { index, .. } => PathError {
+                            path::ErrorKind::ParseErrorAtIndex { index, .. } => PathError {
                                 message: kind.to_string(),
                                 location: Some(index.to_string()),
                             },
 
-                            ErrorKind::ParseError { .. } => PathError {
+                            path::ErrorKind::ParseError { .. } => PathError {
                                 message: kind.to_string(),
                                 location: None,
                             },
 
-                            ErrorKind::InvalidUtf8InPathParam { key } => PathError {
+                            path::ErrorKind::InvalidUtf8InPathParam { key } => PathError {
                                 message: kind.to_string(),
                                 location: Some(key.clone()),
                             },
 
-                            ErrorKind::UnsupportedType { .. } => {
+                            path::ErrorKind::UnsupportedType { .. } => {
                                 // this error is caused by the programmer using an unsupported type
                                 // (such as nested maps) so respond with `500` instead
                                 status = StatusCode::INTERNAL_SERVER_ERROR;
@@ -169,7 +186,7 @@ where
                                 }
                             }
 
-                            ErrorKind::Message(msg) => PathError {
+                            path::ErrorKind::Message(msg) => PathError {
                                 message: msg.clone(),
                                 location: None,
                             },

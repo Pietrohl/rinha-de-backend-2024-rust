@@ -2,6 +2,7 @@ use crate::db::ConnectionPool;
 use crate::db::EXTRATO_QUERY_STATEMENT;
 use crate::db::TRANSACAO_QUERY_STATEMENT_1;
 use crate::db::TRANSACAO_QUERY_STATEMENT_2;
+use crate::db::TRANSACAO_UPDATE_CLIENT;
 use crate::internal_error;
 use crate::structs::BalanceDTO;
 use crate::structs::Client;
@@ -44,6 +45,21 @@ pub async fn transacao(
         .await
         .map_err(internal_error)?;
 
+    let mut client = Client::from(
+        &conn
+            .query_one(TRANSACAO_QUERY_STATEMENT_2, &[&(id as i32)])
+            .await
+            .map_err(internal_error)?,
+    );
+
+    client
+        .new_transaction(payload.value, &payload.transaction_type)
+        .map_err(internal_error)?;
+
+    conn.execute(TRANSACAO_UPDATE_CLIENT, &[&(id as i32), &client.balance])
+        .await
+        .map_err(internal_error)?;
+
     conn.execute(
         TRANSACAO_QUERY_STATEMENT_1,
         &[
@@ -56,11 +72,5 @@ pub async fn transacao(
     .await
     .map_err(internal_error)?;
 
-    let row = conn
-        .query_one(TRANSACAO_QUERY_STATEMENT_2, &[&(id as i32)])
-        .await
-        .map_err(internal_error)?;
-
-
-    Ok((StatusCode::OK, Json(BalanceDTO::from(Client::from(&row)))))
+    Ok((StatusCode::OK, Json(BalanceDTO::from(client))))
 }

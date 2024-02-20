@@ -29,13 +29,10 @@ pub(crate) const TRANSACAO_QUERY_STATEMENT_1: &str = "
         ($1, $2, $3, $4);
    ";
 
-
-
-
-
 pub(crate) const TRANSACAO_QUERY_STATEMENT_2: &str = " SELECT c.id AS id,
    c.name AS name,
    c.limit AS limit,
    c.balance AS balance
    FROM clients c WHERE id = $1;";
 
+pub(crate) const TRANSACAO_UPDATE_CLIENT: &str = "UPDATE clients SET balance = $2 WHERE id = $1;";
