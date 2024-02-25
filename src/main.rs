@@ -15,11 +15,13 @@ use tokio_postgres::NoTls;
 async fn main() {
     let manager = PostgresConnectionManager::new_from_stringlike(DATABASE_URL, NoTls).unwrap();
     let pool = Pool::builder().build(manager).await.unwrap();
+    let database = db::PostgresDatabase::new(pool.clone());
+
 
     let app = Router::new()
         .route("/clientes/:id/transacoes", post(transacao))
         .route("/clientes/:id/extrato", get(extrato))
-        .with_state(pool);
+        .with_state(database);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:9999").await.unwrap();
     axum::serve(listener, app).await.unwrap();
