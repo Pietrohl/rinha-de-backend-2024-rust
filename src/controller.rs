@@ -3,7 +3,9 @@ use crate::db::EXTRATO_QUERY_STATEMENT;
 use crate::db::TRANSACAO_QUERY_STATEMENT_1;
 use crate::db::TRANSACAO_QUERY_STATEMENT_2;
 use crate::db::TRANSACAO_UPDATE_CLIENT;
-use crate::internal_error;
+use crate::error_handling::internal_error;
+use crate::error_handling::not_found_error;
+use crate::error_handling::saldo_error;
 use crate::structs::BalanceDTO;
 use crate::structs::Client;
 use crate::structs::TransactionDTO;
@@ -26,7 +28,10 @@ pub async fn extrato(
         .await
         .map_err(internal_error)?;
 
-    Ok(Json(StatementDTO::from(rows)))
+    Ok((
+        StatusCode::OK,
+        Json(StatementDTO::from(rows).map_err(not_found_error)?),
+    ))
 }
 
 pub async fn transacao(
@@ -49,16 +54,16 @@ pub async fn transacao(
         &conn
             .query_one(TRANSACAO_QUERY_STATEMENT_2, &[&(id as i32)])
             .await
-            .map_err(internal_error)?,
+            .map_err(not_found_error)?,
     );
 
     client
-        .new_transaction(payload.value, &payload.transaction_type)
-        .map_err(internal_error)?;
+        .new_transaction(payload.value, &payload.transaction_type, &payload.description)
+        .map_err(saldo_error)?;
 
     conn.execute(TRANSACAO_UPDATE_CLIENT, &[&(id as i32), &client.balance])
         .await
-        .map_err(internal_error)?;
+        .map_err(saldo_error)?;
 
     conn.execute(
         TRANSACAO_QUERY_STATEMENT_1,
@@ -70,7 +75,7 @@ pub async fn transacao(
         ],
     )
     .await
-    .map_err(internal_error)?;
+    .map_err(saldo_error)?;
 
     Ok((StatusCode::OK, Json(BalanceDTO::from(client))))
 }

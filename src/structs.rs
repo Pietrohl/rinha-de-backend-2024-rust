@@ -26,22 +26,29 @@ impl Client {
             balance: row.get("balance"),
         }
     }
-    pub fn new_transaction(&mut self, value: i32, transaction_type: &str) -> Result<(), Error> {
-        match transaction_type {
-            "c" => {
+    pub fn new_transaction(
+        &mut self,
+        value: i32,
+        transaction_type: &str,
+        description: &str,
+    ) -> Result<(), Error> {
+        match description.len() {
+            1..=10 if transaction_type == "c" => {
                 self.balance += value;
 
-
                 Ok(())
             }
-            "d" => {
-                if (self.balance + self.limit - value) < 0 {
+            1..=10 if transaction_type == "d" => {
+                if (self.balance + self.limit - value.abs()) < 0 {
                     return Err(Error::new(std::io::ErrorKind::Other, "Insufficient funds"));
                 }
-                self.balance -= value;
+                self.balance -= value.abs();
                 Ok(())
             }
-            _ => Err(Error::new(std::io::ErrorKind::Other, "Invalid transaction type")),
+            _ => Err(Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid transaction type",
+            )),
         }
     }
 }
@@ -49,7 +56,9 @@ impl Client {
 #[derive(Serialize)]
 pub struct Balance {
     total: i32,
+    #[serde(rename = "data_extrato")]
     date: DateTime<Utc>,
+    #[serde(rename = "limite")]
     limit: i32,
 }
 
@@ -82,50 +91,60 @@ pub struct TransactionDTO {
 
 #[derive(Serialize)]
 struct Transaction {
+    #[serde(rename = "valor")]
     value: i32,
+    #[serde(rename = "tipo")]
     transaction_type: Box<str>,
+    #[serde(rename = "descricao")]
     description: String,
+    #[serde(rename = "realizada_em")]
     timestamp: DateTime<Utc>,
 }
 
 #[derive(Serialize)]
 pub struct StatementDTO {
+    #[serde(rename = "saldo")]
     balance: Balance,
+    #[serde(rename = "ultimas_transacoes")]
     last_transactions: Vec<Transaction>,
 }
 
 impl StatementDTO {
-    pub fn from(rows: Vec<Row>) -> StatementDTO {
-        let mut transactions = Vec::new();
+    pub fn from(rows: Vec<Row>) -> Result<StatementDTO, Error> {
+        match rows.first() {
+            Some(client_row) => {
+                let client = Client::from(client_row);
+                let mut transactions = Vec::new();
 
-        let client = Client::from(&rows.first().unwrap());
+                let balance = Balance {
+                    total: client.balance,
+                    limit: client.limit,
+                    date: SystemTime::now().into(),
+                };
 
-        let balance = Balance {
-            total: client.balance,
-            limit: client.limit,
-            date: SystemTime::now().into(),
-        };
+                for row in rows {
+                    let unix_timestamp: Option<SystemTime> = row.get("transaction_timestamp");
 
-        for row in rows {
-            let unix_timestamp: Option<SystemTime> = row.get("transaction_timestamp");
-
-            match unix_timestamp {
-                Some(timestamp) => {
-                    let transaction = Transaction {
-                        value: row.get("transaction_value"),
-                        transaction_type: row.get("transaction_type"),
-                        description: row.get("transaction_description"),
-                        timestamp: timestamp.into(),
-                    };
-                    transactions.push(transaction);
+                    match unix_timestamp {
+                        Some(timestamp) => {
+                            let transaction = Transaction {
+                                value: row.get("transaction_value"),
+                                transaction_type: row.get("transaction_type"),
+                                description: row.get("transaction_description"),
+                                timestamp: timestamp.into(),
+                            };
+                            transactions.push(transaction);
+                        }
+                        None => {}
+                    }
                 }
-                None => {}
-            }
-        }
 
-        StatementDTO {
-            balance,
-            last_transactions: transactions,
+                Ok(StatementDTO {
+                    balance,
+                    last_transactions: transactions,
+                })
+            }
+            None => Err(Error::new(std::io::ErrorKind::Other, "Client not found")),
         }
     }
 }

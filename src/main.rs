@@ -1,5 +1,6 @@
 mod controller;
 mod db;
+mod error_handling;
 mod structs;
 
 use crate::structs::StatementDTO;
@@ -20,13 +21,6 @@ async fn main() {
         .route("/clientes/:id/extrato", get(extrato))
         .with_state(pool);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:9999").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-fn internal_error<E>(err: E) -> (StatusCode, String)
-where
-    E: std::error::Error,
-{
-    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
 }

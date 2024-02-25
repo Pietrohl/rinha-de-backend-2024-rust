@@ -21,7 +21,10 @@ clients c
 LEFT JOIN 
 transactions t ON c.id = t.client_id
 WHERE
-c.id = $1;";
+c.id = $1 
+ORDER BY 
+    t.id DESC
+LIMIT 10;";
 
 pub(crate) const TRANSACAO_QUERY_STATEMENT_1: &str = "
     INSERT INTO transactions (client_id, value, type, description) 
@@ -33,6 +36,6 @@ pub(crate) const TRANSACAO_QUERY_STATEMENT_2: &str = " SELECT c.id AS id,
    c.name AS name,
    c.limit AS limit,
    c.balance AS balance
-   FROM clients c WHERE id = $1;";
+   FROM clients c WHERE id = $1 ;";
 
 pub(crate) const TRANSACAO_UPDATE_CLIENT: &str = "UPDATE clients SET balance = $2 WHERE id = $1;";
