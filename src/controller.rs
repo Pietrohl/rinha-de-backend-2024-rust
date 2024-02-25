@@ -4,7 +4,6 @@ use crate::error_handling::internal_error;
 use crate::error_handling::not_found_error;
 use crate::error_handling::saldo_error;
 use crate::structs::BalanceDTO;
-use crate::structs::Client;
 use crate::structs::TransactionDTO;
 use crate::StatementDTO;
 use crate::StatusCode;

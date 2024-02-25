@@ -1,7 +1,6 @@
 use axum::async_trait;
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
-use serde::de;
 use tokio_postgres::{NoTls, Row};
 
 pub(crate) type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;

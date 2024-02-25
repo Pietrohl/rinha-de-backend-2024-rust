@@ -26,31 +26,6 @@ impl Client {
             balance: row.get("balance"),
         }
     }
-    pub fn new_transaction(
-        &mut self,
-        value: i32,
-        transaction_type: &str,
-        description: &str,
-    ) -> Result<(), Error> {
-        match description.len() {
-            1..=10 if transaction_type == "c" => {
-                self.balance += value;
-
-                Ok(())
-            }
-            1..=10 if transaction_type == "d" => {
-                if (self.balance + self.limit - value.abs()) < 0 {
-                    return Err(Error::new(std::io::ErrorKind::Other, "Insufficient funds"));
-                }
-                self.balance -= value.abs();
-                Ok(())
-            }
-            _ => Err(Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid transaction type",
-            )),
-        }
-    }
 }
 
 #[derive(Serialize)]
@@ -154,7 +129,6 @@ struct Path<T>(T);
 #[async_trait]
 impl<S, T> FromRequestParts<S> for Path<T>
 where
-    // these trait bounds are copied from `impl FromRequest for axum::extract::path::Path`
     T: DeserializeOwned + Send,
     S: Send + Sync,
 {
