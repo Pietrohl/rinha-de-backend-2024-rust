@@ -12,22 +12,18 @@ pub(crate) type BB8PooledConnection<'a> =
 #[async_trait]
 pub trait DBConnection<'a> {
     async fn query_extrato(&self, id: i32) -> Result<Vec<Row>, tokio_postgres::Error>;
-    async fn query_client(&self, id: i32) -> Result<Row, tokio_postgres::Error>;
     async fn insert_transaction(
         &self,
         id: i32,
         value: i32,
         transaction_type: &str,
         description: &str,
-    ) -> Result<u64, tokio_postgres::Error>;
-    async fn update_client(&self, id: i32, balance: i32) -> Result<u64, tokio_postgres::Error>;
+    ) -> Result<Row, tokio_postgres::Error>;
 }
 
 pub(crate) struct PostgresConnection<'a> {
     conn: BB8PooledConnection<'a>,
 }
-
-
 
 impl<'a> PostgresConnection<'a> {
     pub fn new(conn: BB8PooledConnection<'a>) -> Self {
@@ -41,37 +37,25 @@ impl<'a> DBConnection<'a> for PostgresConnection<'a> {
         self.conn.query(EXTRATO_QUERY_STATEMENT, &[&id]).await
     }
 
-    async fn query_client(&self, id: i32) -> Result<Row, tokio_postgres::Error> {
-        self.conn
-            .query_one(TRANSACAO_QUERY_STATEMENT_2, &[&id])
-            .await
-    }
-
     async fn insert_transaction(
         &self,
         id: i32,
         value: i32,
         transaction_type: &str,
         description: &str,
-    ) -> Result<u64, tokio_postgres::Error> {
+    ) -> Result<Row, tokio_postgres::Error> {
         self.conn
-            .execute(
-                TRANSACAO_QUERY_STATEMENT_1,
-                &[&id, &value, &transaction_type, &description],
+            .query_one(
+                TRANSACAO_QUERY_STATEMENT,
+                &[&id, &value, &transaction_type, &description, &value.abs()],
             )
-            .await
-    }
-
-    async fn update_client(&self, id: i32, balance: i32) -> Result<u64, tokio_postgres::Error> {
-        self.conn
-            .execute(TRANSACAO_UPDATE_CLIENT, &[&id, &balance])
             .await
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct PostgresDatabase {
-   pub pool: ConnectionPool,
+    pub pool: ConnectionPool,
 }
 
 impl PostgresDatabase {
@@ -85,7 +69,7 @@ pub(crate) const DATABASE_URL: &str = "host=localhost user=postgres dbname=rinha
 pub(crate) const EXTRATO_QUERY_STATEMENT: &str = "SELECT 
 c.id AS id,
 c.name AS name,
-c.limit AS limit,
+c.max_limit AS limit,
 c.balance AS balance,
 t.id AS transaction_id,
 t.value AS transaction_value,
@@ -102,16 +86,24 @@ ORDER BY
     t.id DESC
 LIMIT 10;";
 
-pub(crate) const TRANSACAO_QUERY_STATEMENT_1: &str = "
+pub(crate) const TRANSACAO_QUERY_STATEMENT: &str = "WITH updated_balance AS (
+      UPDATE clients
+      SET balance = balance + $2   
+      WHERE id = $1  AND max_limit + balance + $2 >= 0  
+       RETURNING balance, max_limit
+  ),
+  inserted_transaction AS (
     INSERT INTO transactions (client_id, value, type, description) 
-    VALUES 
-        ($1, $2, $3, $4);
-   ";
-
-pub(crate) const TRANSACAO_QUERY_STATEMENT_2: &str = " SELECT c.id AS id,
-   c.name AS name,
-   c.limit AS limit,
-   c.balance AS balance
-   FROM clients c WHERE id = $1 ;";
-
-pub(crate) const TRANSACAO_UPDATE_CLIENT: &str = "UPDATE clients SET balance = $2 WHERE id = $1;";
+      SELECT 
+         $1,
+         $5,
+         $3,
+         $4
+    WHERE EXISTS (
+        SELECT 1 
+        FROM updated_balance
+        WHERE balance IS NOT NULL
+    )
+)
+SELECT * FROM updated_balance;
+  ";

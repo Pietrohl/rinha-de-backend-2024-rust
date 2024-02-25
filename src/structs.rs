@@ -71,10 +71,10 @@ pub struct BalanceDTO {
 }
 
 impl BalanceDTO {
-    pub fn from(client: Client) -> BalanceDTO {
+    pub fn from(row: &Row) -> BalanceDTO {
         BalanceDTO {
-            total: client.balance,
-            limit: client.limit,
+            total: row.get("balance"),
+            limit: row.get("max_limit"),
         }
     }
 }
@@ -84,7 +84,7 @@ pub struct TransactionDTO {
     #[serde(rename = "valor")]
     pub value: i32,
     #[serde(rename = "tipo")]
-    pub transaction_type: Box<str>,
+    pub transaction_type: String,
     #[serde(rename = "descricao")]
     pub description: String,
 }

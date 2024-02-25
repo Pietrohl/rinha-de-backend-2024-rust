@@ -2,7 +2,7 @@ CREATE UNLOGGED TABLE clients
 (
     id SERIAL PRIMARY KEY,
     name varchar(10) NOT NULL,
-    "limit" integer NOT NULL,
+    max_limit integer NOT NULL,
     balance integer NOT NULL
 );
 
@@ -20,7 +20,7 @@ CREATE UNLOGGED TABLE transactions
 )
 ;
 
-INSERT INTO clients(name, "limit", balance)
+INSERT INTO clients(name, max_limit, balance)
 	VALUES ('one', 100000, 0),
     ('two', 80000, 0),
     ('three', 1000000, 0),

@@ -37,33 +37,28 @@ pub async fn transacao(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let conn = PostgresConnection::new(database.pool.get().await.map_err(internal_error)?);
 
-    let mut client = Client::from(
+    let value: i32 = match (payload.transaction_type.as_str(), payload.description.as_str().len()) {
+        ("c", 1..=10) => payload.value,
+        ("d", 1..=10) => -payload.value,
+        _ => {
+            return Err((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "Invalid transaction type".to_string(),
+            ))
+        }
+    };
+
+    let balance = BalanceDTO::from(
         &conn
-            .query_client(id as i32)
+            .insert_transaction(
+                id as i32,
+                value as i32,
+                &payload.transaction_type,
+                &payload.description,
+            )
             .await
-            .map_err(not_found_error)?,
+            .map_err(saldo_error)?,
     );
 
-    client
-        .new_transaction(
-            payload.value,
-            &payload.transaction_type,
-            &payload.description,
-        )
-        .map_err(saldo_error)?;
-
-    conn.update_client(id as i32, client.balance)
-        .await
-        .map_err(saldo_error)?;
-
-    conn.insert_transaction(
-        id as i32,
-        payload.value,
-        &payload.transaction_type,
-        &payload.description,
-    )
-    .await
-    .map_err(saldo_error)?;
-
-    Ok((StatusCode::OK, Json(BalanceDTO::from(client))))
+    Ok((StatusCode::OK, Json(balance)))
 }
