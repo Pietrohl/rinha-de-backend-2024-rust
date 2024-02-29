@@ -26,8 +26,8 @@ async fn main() {
     let pool = Pool::builder().build(manager).await.unwrap();
     let database = db::PostgresDatabase::new(pool.clone());
 
-    let listener = std::net::TcpListener::bind("0.0.0.0:9999")
-        .expect("error listening to socket 0.0.0.0:9999");
+    let listener = std::net::TcpListener::bind("0.0.0.0:3000")
+        .expect("error listening to socket 0.0.0.0:3000");
     listener.set_nonblocking(true).unwrap();
 
     let listener = tokio::net::TcpListener::from_std(listener).expect("error parsing std listener");
@@ -37,6 +37,8 @@ async fn main() {
         .route("/clientes/:id/extrato", get(extrato))
         .with_state(database);
 
+    eprintln!("Server up!");
+    
     loop {
         let (stream, _) = listener.accept().await.unwrap();
 

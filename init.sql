@@ -1,3 +1,6 @@
+GRANT ALL PRIVILEGES ON DATABASE rinha_db TO postgres;
+
+
 CREATE UNLOGGED TABLE clients
 (
     id SERIAL PRIMARY KEY,

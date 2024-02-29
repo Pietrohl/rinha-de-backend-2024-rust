@@ -43,9 +43,12 @@ impl<'a> DBConnection<'a> for PostgresConnection<'a> {
         transaction_type: &str,
         description: &str,
     ) -> Result<Row, tokio_postgres::Error> {
+       
+        let statement = self.conn.prepare(TRANSACAO_QUERY_STATEMENT).await?;
+
         self.conn
             .query_one(
-                TRANSACAO_QUERY_STATEMENT,
+                &statement,
                 &[&id, &value, &transaction_type, &description, &value.abs()],
             )
             .await
@@ -63,7 +66,8 @@ impl PostgresDatabase {
     }
 }
 
-pub(crate) const DATABASE_URL: &str = "host=localhost user=postgres dbname=rinha_db";
+pub(crate) const DATABASE_URL: &str =
+    "host=db port=5432 password=postgres user=postgres dbname=rinha_db";
 
 pub(crate) const EXTRATO_QUERY_STATEMENT: &str = "SELECT 
 c.id AS id,
