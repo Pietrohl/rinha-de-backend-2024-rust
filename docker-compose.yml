@@ -2,7 +2,7 @@ version: '3.5'
 
 services:
   api01: &api
-    build: .
+    image: phalabadessa/rinha-rust-2024:v1
     hostname: api01
     expose: 
       - "3000"
