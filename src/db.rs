@@ -44,12 +44,12 @@ impl<'a> DBConnection<'a> for PostgresConnection<'a> {
         description: &str,
     ) -> Result<Row, tokio_postgres::Error> {
        
-        let statement = self.conn.prepare(TRANSACAO_QUERY_STATEMENT).await?;
+        // let statement = self.conn.prepare(TRANSACAO_QUERY_STATEMENT).await?;
 
         self.conn
             .query_one(
-                &statement,
-                &[&id, &value, &transaction_type, &description, &value.abs()],
+                TRANSACAO_QUERY_STATEMENT,
+                &[&id, &value, &transaction_type, &description],
             )
             .await
     }
@@ -89,24 +89,26 @@ ORDER BY
     t.id DESC
 LIMIT 10;";
 
-pub(crate) const TRANSACAO_QUERY_STATEMENT: &str = "WITH updated_balance AS (
-      UPDATE clients
-      SET balance = balance + $2   
-      WHERE id = $1  AND max_limit + balance + $2 >= 0  
-       RETURNING balance, max_limit
-  ),
-  inserted_transaction AS (
-    INSERT INTO transactions (client_id, value, type, description) 
-      SELECT 
-         $1,
-         $5,
-         $3,
-         $4
-    WHERE EXISTS (
-        SELECT 1 
-        FROM updated_balance
-        WHERE balance IS NOT NULL
-    )
-)
-SELECT * FROM updated_balance;
-  ";
+// pub(crate) const TRANSACAO_QUERY_STATEMENT: &str = "WITH updated_balance AS (
+//       UPDATE clients
+//       SET balance = balance + $2   
+//       WHERE id = $1  AND max_limit + balance + $2 >= 0  
+//        RETURNING balance, max_limit
+//   ),
+//   inserted_transaction AS (
+//     INSERT INTO transactions (client_id, value, type, description) 
+//       SELECT 
+//          $1,
+//          $5,
+//          $3,
+//          $4
+//     WHERE EXISTS (
+//         SELECT 1 
+//         FROM updated_balance
+//         WHERE balance IS NOT NULL
+//     )
+// )
+// SELECT * FROM updated_balance;
+//   ";
+
+pub(crate) const TRANSACAO_QUERY_STATEMENT: &str = "CALL public.insert_transaction($1, $2, $3, $4, 0,0);";

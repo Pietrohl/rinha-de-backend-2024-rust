@@ -48,8 +48,8 @@ pub struct BalanceDTO {
 impl BalanceDTO {
     pub fn from(row: &Row) -> BalanceDTO {
         BalanceDTO {
-            total: row.get("balance"),
-            limit: row.get("max_limit"),
+            total: row.get("return_balance"),
+            limit: row.get("return_limit"),
         }
     }
 }
