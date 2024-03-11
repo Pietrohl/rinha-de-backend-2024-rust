@@ -4,14 +4,11 @@ use axum::{
     extract::{path, rejection::PathRejection, FromRequestParts},
     http::{request::Parts, StatusCode},
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::{io::Error, time::SystemTime};
 use tokio_postgres::Row;
-
-
-#[allow(dead_code)]
 
 #[derive(Serialize, Deserialize)]
 pub struct Client {
@@ -21,16 +18,6 @@ pub struct Client {
     pub balance: i32,
 }
 
-impl Client {
-    pub fn from(row: &Row) -> Client {
-        Client {
-            id: row.get("id"),
-            name: row.get("name"),
-            limit: row.get("limit"),
-            balance: row.get("balance"),
-        }
-    }
-}
 
 #[derive(Serialize)]
 pub struct Balance {
@@ -49,13 +36,8 @@ pub struct BalanceDTO {
     limit: i32,
 }
 
+#[allow(dead_code)]
 impl BalanceDTO {
-    pub fn from(row: &Row) -> BalanceDTO {
-        BalanceDTO {
-            total: row.get("return_balance"),
-            limit: row.get("return_limit"),
-        }
-    }
 
     pub fn from_alesia_response(response: Vec<TableRow>) -> Result<BalanceDTO, Error> {
         match response.first() {
@@ -87,7 +69,7 @@ struct Transaction {
     #[serde(rename = "descricao")]
     description: String,
     #[serde(rename = "realizada_em")]
-    timestamp: DateTime<Utc>,
+    timestamp: NaiveDateTime,
 }
 
 #[derive(Serialize)]
@@ -99,44 +81,6 @@ pub struct StatementDTO {
 }
 
 impl StatementDTO {
-    pub fn from(rows: Vec<Row>) -> Result<StatementDTO, Error> {
-        match rows.first() {
-            Some(client_row) => {
-                let client = Client::from(client_row);
-                let mut transactions = Vec::new();
-
-                let balance = Balance {
-                    total: client.balance,
-                    limit: client.limit,
-                    date: SystemTime::now().into(),
-                };
-
-                for row in rows {
-                    let unix_timestamp: Option<SystemTime> = row.get("transaction_timestamp");
-
-                    match unix_timestamp {
-                        Some(timestamp) => {
-                            let transaction = Transaction {
-                                value: row.get("transaction_value"),
-                                transaction_type: row.get("transaction_type"),
-                                description: row.get("transaction_description"),
-                                timestamp: timestamp.into(),
-                            };
-                            transactions.push(transaction);
-                        }
-                        None => {}
-                    }
-                }
-
-                Ok(StatementDTO {
-                    balance,
-                    last_transactions: transactions,
-                })
-            }
-            None => Err(Error::new(std::io::ErrorKind::Other, "Client not found")),
-        }
-    }
-
     pub fn from_alesia_response(response: Vec<TableRow>) -> Result<StatementDTO, Error> {
         match response.first() {
             Some(client_row) => {
@@ -156,9 +100,9 @@ impl StatementDTO {
 
                 for row in response {
                     let unix_timestamp_string: String = row.get(8).into();
-                    let unix_timestamp = DateTime::parse_from_str(
+                    let unix_timestamp = chrono::NaiveDateTime::parse_from_str(
                         &unix_timestamp_string,
-                        "%Y %b %d %H:%M:%S%.3f %z",
+                        "%Y-%m-%d %H:%M:%S",
                     );
 
                     match unix_timestamp {
@@ -167,7 +111,7 @@ impl StatementDTO {
                                 value: row.get(5).into(),
                                 transaction_type: row.get(6).into(),
                                 description: row.get(7).into(),
-                                timestamp: timestamp.into(),
+                                timestamp,
                             };
                             transactions.push(transaction);
                         }

@@ -44,7 +44,7 @@ pub async fn query_balance(alesia_client: &mut AlesiaClient, id: i32) -> Result<
 const EXTRATO_QUERY_STATEMENT: &str = "SELECT 
 c.id AS id,
 c.name AS name,
-c.max_limit AS limit,
+c.max_limit,
 c.balance AS balance,
 t.id AS transaction_id,
 t.value AS transaction_value,

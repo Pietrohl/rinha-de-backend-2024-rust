@@ -1,5 +1,4 @@
 mod controller;
-mod db;
 mod error_handling;
 mod structs;
 mod sql_db;
