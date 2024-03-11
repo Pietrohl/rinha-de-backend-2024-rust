@@ -5,21 +5,16 @@ mod structs;
 mod sql_db;
 
 use crate::structs::StatementDTO;
-use alesia_client::AlesiaClient;
 use axum::{
     extract::Request,
     http::StatusCode,
     routing::{get, post},
     Router,
 };
-use bb8::Pool;
-use bb8_postgres::PostgresConnectionManager;
 use controller::{extrato, transacao};
-use db::DATABASE_URL;
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server;
-use tokio_postgres::NoTls;
 use tower::Service;
 
 #[tokio::main]

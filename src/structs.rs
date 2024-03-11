@@ -1,4 +1,4 @@
-use alesia_client::types::{dto::ResponseDTO, structs::TableRow};
+use alesia_client::types::structs::TableRow;
 use axum::{
     async_trait,
     extract::{path, rejection::PathRejection, FromRequestParts},
@@ -9,6 +9,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::{io::Error, time::SystemTime};
 use tokio_postgres::Row;
+
+
+#[allow(dead_code)]
 
 #[derive(Serialize, Deserialize)]
 pub struct Client {
@@ -55,10 +58,10 @@ impl BalanceDTO {
     }
 
     pub fn from_alesia_response(response: Vec<TableRow>) -> Result<BalanceDTO, Error> {
-        match response.rows.first() {
+        match response.first() {
             Some(row) => Ok(BalanceDTO {
-                total: row.columns[0].into(),
-                limit: row.columns[1].into(),
+                total: row.get(0).into(),
+                limit: row.get(1).into(),
             }),
             None => Err(Error::new(std::io::ErrorKind::Other, "Client not found")),
         }
@@ -80,7 +83,7 @@ struct Transaction {
     #[serde(rename = "valor")]
     value: i32,
     #[serde(rename = "tipo")]
-    transaction_type: Box<str>,
+    transaction_type: String,
     #[serde(rename = "descricao")]
     description: String,
     #[serde(rename = "realizada_em")]
@@ -135,13 +138,13 @@ impl StatementDTO {
     }
 
     pub fn from_alesia_response(response: Vec<TableRow>) -> Result<StatementDTO, Error> {
-        match response.rows.first() {
+        match response.first() {
             Some(client_row) => {
                 let client = Client {
-                    id: client_row.columns[0].into(),
-                    name: client_row.columns[1].into(),
-                    limit: client_row.columns[2].into(),
-                    balance: client_row.columns[3].into(),
+                    id: client_row.get(0).into(),
+                    name: client_row.get(1).into(),
+                    limit: client_row.get(2).into(),
+                    balance: client_row.get(3).into(),
                 };
                 let mut transactions = Vec::new();
 
@@ -151,22 +154,24 @@ impl StatementDTO {
                     date: SystemTime::now().into(),
                 };
 
-                for row in response.rows {
-                    let unix_timestamp_string: String = row.columns[8].into();
-                    let unix_timestamp: Option<SystemTime> =
-                        SystemTime::unix_timestamp_string.into();
+                for row in response {
+                    let unix_timestamp_string: String = row.get(8).into();
+                    let unix_timestamp = DateTime::parse_from_str(
+                        &unix_timestamp_string,
+                        "%Y %b %d %H:%M:%S%.3f %z",
+                    );
 
-                    match unix_timestamp_string {
-                        Some(timestamp) => {
+                    match unix_timestamp {
+                        Ok(timestamp) => {
                             let transaction = Transaction {
-                                value: row.columns[5].into(),
-                                transaction_type: (row.columns[6].into() as String).into(),
-                                description: row.columns[7].into(),
+                                value: row.get(5).into(),
+                                transaction_type: row.get(6).into(),
+                                description: row.get(7).into(),
                                 timestamp: timestamp.into(),
                             };
                             transactions.push(transaction);
                         }
-                        None => {}
+                        Err(_) => {}
                     }
                 }
                 Ok(StatementDTO {
