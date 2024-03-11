@@ -2,8 +2,10 @@ mod controller;
 mod db;
 mod error_handling;
 mod structs;
+mod sql_db;
 
 use crate::structs::StatementDTO;
+use alesia_client::AlesiaClient;
 use axum::{
     extract::Request,
     http::StatusCode,
@@ -22,9 +24,6 @@ use tower::Service;
 
 #[tokio::main]
 async fn main() {
-    let manager = PostgresConnectionManager::new_from_stringlike(DATABASE_URL, NoTls).unwrap();
-    let pool = Pool::builder().build(manager).await.unwrap();
-    let database = db::PostgresDatabase::new(pool.clone());
 
     let listener = std::net::TcpListener::bind("0.0.0.0:3000")
         .expect("error listening to socket 0.0.0.0:3000");
@@ -34,8 +33,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/clientes/:id/transacoes", post(transacao))
-        .route("/clientes/:id/extrato", get(extrato))
-        .with_state(database);
+        .route("/clientes/:id/extrato", get(extrato));
 
     eprintln!("Server up!");
     

@@ -1,12 +1,17 @@
-use alesia_client::{types::dto::ResponseDTO, AlesiaClient};
+use std::io::Error;
+
+use alesia_client::{types::structs::TableRow, AlesiaClient};
 
 pub async fn query_extrato(
     alesia_client: &mut AlesiaClient,
     id: i32,
-) -> Result<ResponseDTO, Box<dyn std::error::Error>> {
-    alesia_client
-        .send_query(EXTRATO_QUERY_STATEMENT, &[&id])
-        .await
+) -> Result<Vec<TableRow>, Error> {
+    let response = alesia_client.query(EXTRATO_QUERY_STATEMENT, &[&id]).await;
+
+    match response {
+        Ok(response) => Ok(response),
+        Err(err) => Err(Error::new(std::io::ErrorKind::Other, err.to_string())),
+    }
 }
 
 pub async fn insert_transaction(
@@ -15,14 +20,26 @@ pub async fn insert_transaction(
     value: i32,
     transaction_type: String,
     description: String,
-) -> Result<ResponseDTO, Box<dyn std::error::Error>> {
+) -> Result<(), Error> {
     alesia_client
-        .send_query(
+        .insert(
             TRANSACAO_QUERY_STATEMENT,
             &[&id, &value, &transaction_type, &description, &value.abs()],
         )
         .await
+        .map_err(|err| Error::new(std::io::ErrorKind::Other, err.to_string()))
 }
+
+pub async fn query_balance(alesia_client: &mut AlesiaClient, id: i32) -> Result<Vec<TableRow>, Error> {
+    let response = alesia_client.query(BALANCE_QUERY_STATEMENT, &[&id]).await;
+
+    match response {
+        Ok(response) => Ok(response),
+        Err(err) => Err(Error::new(std::io::ErrorKind::Other, err.to_string())),
+    }
+}
+
+
 
 const EXTRATO_QUERY_STATEMENT: &str = "SELECT 
 c.id AS id,
@@ -65,3 +82,6 @@ const TRANSACAO_QUERY_STATEMENT: &str = "WITH updated_balance AS (
 )
 SELECT * FROM updated_balance;
   ";
+
+
+const BALANCE_QUERY_STATEMENT: &str = "SELECT balance, max_limit FROM clients WHERE id = ?1;";

@@ -1,3 +1,4 @@
+use alesia_client::types::{dto::ResponseDTO, structs::TableRow};
 use axum::{
     async_trait,
     extract::{path, rejection::PathRejection, FromRequestParts},
@@ -50,6 +51,16 @@ impl BalanceDTO {
         BalanceDTO {
             total: row.get("return_balance"),
             limit: row.get("return_limit"),
+        }
+    }
+
+    pub fn from_alesia_response(response: Vec<TableRow>) -> Result<BalanceDTO, Error> {
+        match response.rows.first() {
+            Some(row) => Ok(BalanceDTO {
+                total: row.columns[0].into(),
+                limit: row.columns[1].into(),
+            }),
+            None => Err(Error::new(std::io::ErrorKind::Other, "Client not found")),
         }
     }
 }
@@ -114,6 +125,50 @@ impl StatementDTO {
                     }
                 }
 
+                Ok(StatementDTO {
+                    balance,
+                    last_transactions: transactions,
+                })
+            }
+            None => Err(Error::new(std::io::ErrorKind::Other, "Client not found")),
+        }
+    }
+
+    pub fn from_alesia_response(response: Vec<TableRow>) -> Result<StatementDTO, Error> {
+        match response.rows.first() {
+            Some(client_row) => {
+                let client = Client {
+                    id: client_row.columns[0].into(),
+                    name: client_row.columns[1].into(),
+                    limit: client_row.columns[2].into(),
+                    balance: client_row.columns[3].into(),
+                };
+                let mut transactions = Vec::new();
+
+                let balance = Balance {
+                    total: client.balance,
+                    limit: client.limit,
+                    date: SystemTime::now().into(),
+                };
+
+                for row in response.rows {
+                    let unix_timestamp_string: String = row.columns[8].into();
+                    let unix_timestamp: Option<SystemTime> =
+                        SystemTime::unix_timestamp_string.into();
+
+                    match unix_timestamp_string {
+                        Some(timestamp) => {
+                            let transaction = Transaction {
+                                value: row.columns[5].into(),
+                                transaction_type: (row.columns[6].into() as String).into(),
+                                description: row.columns[7].into(),
+                                timestamp: timestamp.into(),
+                            };
+                            transactions.push(transaction);
+                        }
+                        None => {}
+                    }
+                }
                 Ok(StatementDTO {
                     balance,
                     last_transactions: transactions,
