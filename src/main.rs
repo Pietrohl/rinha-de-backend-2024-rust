@@ -19,7 +19,7 @@ use tower::Service;
 #[tokio::main]
 async fn main() {
 
-    let listener = std::net::TcpListener::bind("0.0.0.0:3000")
+    let listener = std::net::TcpListener::bind("0.0.0.0:9999")
         .expect("error listening to socket 0.0.0.0:3000");
     listener.set_nonblocking(true).unwrap();
 

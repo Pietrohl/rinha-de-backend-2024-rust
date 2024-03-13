@@ -61,26 +61,21 @@ ORDER BY
     t.id DESC
 LIMIT 10;";
 
-const TRANSACAO_QUERY_STATEMENT: &str = "WITH updated_balance AS (
-      UPDATE clients
-      SET balance = balance + ?2   
-      WHERE id = ?1  AND max_limit + balance + ?2 >= 0  
-       RETURNING balance, max_limit
-  ),
-  inserted_transaction AS (
-    INSERT INTO transactions (client_id, value, type, description) 
-      SELECT 
-         ?1,
-         ?5,
-         ?3,
-         ?4
-    WHERE EXISTS (
-        SELECT 1 
-        FROM updated_balance
-        WHERE balance IS NOT NULL
-    )
+const TRANSACAO_QUERY_STATEMENT: &str = "WITH TempTable AS (
+    SELECT * FROM clients
+    WHERE id = ?1 AND balance + max_limit + ?2 >=0 	
 )
-SELECT * FROM updated_balance;
+INSERT INTO transactions (client_id, value, type, description)
+SELECT
+    ?1 AS client_id,
+    ?5 AS value,
+    ?3 AS type,
+    ?4 AS description
+WHERE EXISTS (
+    SELECT 1
+    FROM TempTable
+    WHERE id IS NOT NULL
+);
   ";
 
 
